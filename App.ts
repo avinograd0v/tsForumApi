@@ -28,11 +28,11 @@ class App {
   }
 
   private routes (): void {
-    this.express.use('/forum', ForumRouter)
-    this.express.use('/post', PostRouter)
-    this.express.use('/service', ServiceRouter)
-    this.express.use('/thread', ThreadRouter)
-    this.express.use('/user', UserRouter)
+    this.express.use('/api/forum', ForumRouter)
+    this.express.use('/api/post', PostRouter)
+    this.express.use('/api/service', ServiceRouter)
+    this.express.use('/api/thread', ThreadRouter)
+    this.express.use('/api/user', UserRouter)
   }
 
 }

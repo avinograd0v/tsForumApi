@@ -20,11 +20,11 @@ var App = (function () {
         this.express.use(bodyParser.urlencoded({ extended: false }));
     };
     App.prototype.routes = function () {
-        this.express.use('/forum', forumRouter_1.default);
-        this.express.use('/post', postRouter_1.default);
-        this.express.use('/service', serviceRouter_1.default);
-        this.express.use('/thread', threadRouter_1.default);
-        this.express.use('/user', userRouter_1.default);
+        this.express.use('/api/forum', forumRouter_1.default);
+        this.express.use('/api/post', postRouter_1.default);
+        this.express.use('/api/service', serviceRouter_1.default);
+        this.express.use('/api/thread', threadRouter_1.default);
+        this.express.use('/api/user', userRouter_1.default);
     };
     return App;
 }());
