@@ -48,14 +48,16 @@ export class UserRouter {
   }
 
   public changeProfile (req: Request, res: Response, next: NextFunction): void {
-    db.users.checkExistanceErrors(req.params.nickname, req.body.email)
-      .then(() =>
-      db.users.update({
-        nickname: req.params.nickname,
-        about: req.body.about,
-        email: req.body.email,
-        fullname: req.body.fullname
-      }))
+    db.task(t => {
+        return t.users.checkExistanceErrors(req.params.nickname, req.body.email)
+          .then(() =>
+          return t.users.update({
+            nickname: req.params.nickname,
+            about: req.body.about,
+            email: req.body.email,
+            fullname: req.body.fullname
+          }))      
+    })
       .then((data: any) => {
         res.status(200)
           .json(data)
