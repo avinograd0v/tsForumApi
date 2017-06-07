@@ -101,9 +101,11 @@ export class ThreadRouter {
         }
       )
         .then((data: any) => {
-          res.status(201)
-            .json(data)
           return t.forums.addToPostsCounter(req.body.length, fId, t)
+            .then(() => {
+              res.status(201)
+                .json(data)
+            })
         })
     })
       .catch((e: Error) => {

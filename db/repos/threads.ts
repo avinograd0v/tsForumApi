@@ -68,11 +68,6 @@ export class Repository {
     return this.db.one(`select id from thread where $(ident:raw)`, { ident })
   }
 
-  preselectAffected = (params: any) =>
-    this.db.one(`select count(p.id)::integer as marker from post p inner join thread t on t.id=p.thread_id
-      where p.parent_id = 0 and $(identifier:raw) $(conditionalLimit:raw) offset $(marker)
-      `, params)
-
   posts = (params: any) => {
     if (params.sort === 'flat') {
       return this.db.any(sql.posts, params)

@@ -30,9 +30,6 @@ var Repository = (function () {
         this.exists = function (ident) {
             return _this.db.one("select id from thread where $(ident:raw)", { ident: ident });
         };
-        this.preselectAffected = function (params) {
-            return _this.db.one("select count(p.id)::integer as marker from post p inner join thread t on t.id=p.thread_id\n      where p.parent_id = 0 and $(identifier:raw) $(conditionalLimit:raw) offset $(marker)\n      ", params);
-        };
         this.posts = function (params) {
             if (params.sort === 'flat') {
                 return _this.db.any(sql.posts, params);

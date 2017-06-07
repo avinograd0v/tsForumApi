@@ -93,9 +93,11 @@ var ThreadRouter = (function () {
                 return t.posts.create(req.body, info, t);
             })
                 .then(function (data) {
-                res.status(201)
-                    .json(data);
-                return t.forums.addToPostsCounter(req.body.length, fId, t);
+                return t.forums.addToPostsCounter(req.body.length, fId, t)
+                    .then(function () {
+                    res.status(201)
+                        .json(data);
+                });
             });
         })
             .catch(function (e) {
