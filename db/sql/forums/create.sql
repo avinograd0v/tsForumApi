@@ -44,18 +44,23 @@
 --        forum f
 --            on f.user_id = up1.user_id;
 
+--insert into forum (slug, title, user_id, user_nickname) values (${slug}, ${title}, ${userID}, ${name})
+--returning slug, title, ${name} as "user";
+
+
 with inserted_result as (insert
 into
     forum
-    (slug, title, user_id) select
-        ${slug},
+    as ci (slug, title, user_id, user_nickname) select
+        ${slug}::citext,
         ${title},
-        ${userID}
+        ${userID},
+        ${name}::citext
     where
         'inserted' = set_config('upsert.action', 'inserted', true)
-            on conflict(user_id) do update
+            on conflict(slug) do update
         set
-            user_id=EXCLUDED.user_id
+            slug=ci.slug
         where
             'updated' = set_config('upsert.action', 'updated', true)
              returning *)
@@ -63,7 +68,6 @@ into
             current_setting('upsert.action') AS "action",
             f.slug,
             f.title,
-            u.nickname as "user"
+            f.user_nickname as "user"
         from
             inserted_result f
-            inner join "user" u on u.id=f.user_id;

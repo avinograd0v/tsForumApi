@@ -19,5 +19,5 @@ set
         else fullname
     end
 where
-    lower(nickname) = lower(${nickname})
+    nickname = ${nickname}::citext
         returning about, email, fullname, nickname;

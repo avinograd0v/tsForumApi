@@ -4,25 +4,12 @@
 */
 
 select
-    (select
-        count(id)::integer
-    from
-        post
-    where
-        forum_id=f.id) as posts   ,
+    f.posts_count as posts   ,
     f.slug,
-    (select
-        count(id)::integer
-    from
-        thread
-    where
-        forum_id=f.id) as threads,
+    f.threads_count as threads,
     f.title,
-    u.nickname as user
+    f.user_nickname as user
 from
     forum f
-inner join
-    "user" u
-        on u.id=f.user_id
 where
-    lower(f.slug)=lower(${slug});
+    f.slug=${slug}::citext;

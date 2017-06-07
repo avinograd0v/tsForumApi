@@ -39,7 +39,9 @@ var ForumRouter = (function () {
             .then(function (fu) {
             return db.threads.create({
                 authorId: fu[0].id,
+                authorNickname: fu[0].title,
                 forumId: fu[1].id,
+                forumSlug: fu[1].title,
                 created: req.body.created,
                 message: req.body.message,
                 slug: req.body.slug,
@@ -47,14 +49,23 @@ var ForumRouter = (function () {
             });
         })
             .then(function (data) {
-            res.status(data.action === 'updated' ? 409 : 201)
+            var code;
+            if (data.action === 'updated') {
+                code = 409;
+            }
+            else {
+                db.forums.addToCounter(data.forum_id);
+                db.threads.addToUserForumRelations({ forum_id: data.forum_id, user_id: data.author_id });
+                code = 201;
+            }
+            res.status(code)
                 .json({
                 slug: data.slug,
                 title: data.title,
-                author: data.author,
+                author: data.author_nickname,
                 id: data.id,
                 message: data.message,
-                forum: data.forum,
+                forum: data.forum_slug,
                 created: data.created
             });
         })
@@ -71,12 +82,12 @@ var ForumRouter = (function () {
                 .json(data);
         })
             .catch(function (e) {
+            console.log(e);
             res.status(404)
                 .end();
         });
     };
     ForumRouter.prototype.getForumThreads = function (req, res, next) {
-        console.log(req.query);
         db.forums.checkForumExistance(req.params.slug)
             .then(function (fm) {
             return db.forums.threads({
@@ -104,12 +115,11 @@ var ForumRouter = (function () {
             return db.forums.users({
                 fID: fm.id,
                 conditionalLimit: req.query.limit === undefined ? '' : "limit " + req.query.limit,
-                conditionalSince: req.query.since === undefined ? '' : "\n             and lower(u.nickname) " + (req.query.desc === 'true' ? '<' : '>') + "\n             lower('" + req.query.since + "')\n          ",
+                conditionalSince: req.query.since === undefined ? '' : "\n             and u.nickname " + (req.query.desc === 'true' ? '<' : '>') + "\n             '" + req.query.since + "'::citext\n          ",
                 orderCondition: req.query.desc === 'true' ? 'desc' : 'asc'
             });
         })
             .then(function (data) {
-            data.forEach(function (user) { delete user.nick; });
             res.status(200)
                 .json(data);
         })

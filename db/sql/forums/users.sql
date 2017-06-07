@@ -4,29 +4,19 @@
 */
 
 select
-    distinct     u.about,
+    u.about,
     u.email,
     u.fullname,
-    u.nickname,
-    convert_to(lower(u.nickname),
-    'UTF8') as nick
+    u.nickname
 from
-    "user" u
-left join
-    thread t
-        on t.author_id = u.id
-left join
-    post p
-        on p.author_id = u.id
+    forum_user_relation
 inner join
-    forum f
-        on f.id = t.forum_id
-        or f.id = p.forum_id
+    "user" u
+on
+    u.id = user_id
 where
-    f.id = ${fID}
-    and (
-        p.id is not null
-        or t.id is not null
-    )     ${conditionalSince:raw}
+    forum_id = ${fID}
+${conditionalSince:raw}
 order by
-    nick ${orderCondition:raw} ${conditionalLimit:raw};
+    u.nickname ${orderCondition:raw}
+${conditionalLimit:raw};

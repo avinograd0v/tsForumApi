@@ -41,6 +41,10 @@ export class Repository {
     this.pgp = pgp
   }
 
+  addToUserForumRelations (info: any) {
+    this.db.none(sql.addToUserForumRelation, info)
+  }
+
   create = (info: Thread): Promise<NewThreadResponse> =>
     this.db.one(sql.create, info)
 
@@ -60,35 +64,44 @@ export class Repository {
       return threadObj
     })
 
+  exists = (ident: string | number) => {
+    return this.db.one(`select id from thread where $(ident:raw)`, { ident })
+  }
+
   preselectAffected = (params: any) =>
     this.db.one(`select count(p.id)::integer as marker from post p inner join thread t on t.id=p.thread_id
       where p.parent_id = 0 and $(identifier:raw) $(conditionalLimit:raw) offset $(marker)
       `, params)
 
-  posts = (params: any, affected: any) => {
+  posts = (params: any) => {
     if (params.sort === 'flat') {
       return this.db.any(sql.posts, params)
     } else if (params.sort === 'tree') {
       return this.db.any(sql.tree, params)
     } else if (params.sort === 'parent_tree') {
-      return this.db.any(`select p.id as marker from post p inner join thread t on t.id=p.thread_id
-      where p.parent_id = 0 and $(identifier:raw) $(conditionalLimit:raw) offset $(marker)
+      return this.db.any(`select array(select p.id  from post p
+      where p.parent_id = 0 and p.thread_id=$(identifier) order by p.id $(orderCondition:raw) $(conditionalLimit:raw)
+       offset $(marker)) as parent_posts
       `, params)
         .then((result: any) => {
-          affected.marker = result.length
-          return this.db.any(sql.parentTree, params)
+          const actualObject = result[0]
+          actualObject.orderCondition = params.orderCondition
+          return this.db.any(sql.parentTree, actualObject)
         })
     }
   }
 
   vote = (params: any) =>
     this.db.one(sql.vote, params)
-      .then((data: any) => {return this.db.one(sql.details, params)})
+      .then((data: any) => {
+        data.vote = (data.vote === data.ex_vote) ? 0 : data.vote
+        return this.db.one(sql.updatevotes, data)
+      })
 
   checkAuthorOrForumExistance = (nickname: string, forum: string): Promise<any> =>
     this.db.result('' +
-      ' with author as (select id, nickname from "user" where lower(nickname)=lower(${nickname})),' +
-      '      fm as (select id, slug from "forum" where lower(slug)=lower(${forum}))' +
+      ' with author as (select id, nickname from "user" where nickname=${nickname}::citext),' +
+      '      fm as (select id, slug from "forum" where slug=${forum}::citext)' +
       ' select id, nickname as title from author union all select id, slug from fm',
       {nickname, forum}, (fu: any) => {
         if (fu.rows.length !== 2) {

@@ -23,13 +23,16 @@ var Repository = (function () {
             return _this.db.any(sql.threads, params);
         };
         this.users = function (params) {
-            return _this.db.result(sql.users, params, function (allUsers) {
-                // console.log(allUsers.rows)
-                return allUsers.rows;
-            });
+            return _this.db.any(sql.users, params);
+        };
+        this.addToCounter = function (id) {
+            return _this.db.none("update forum set threads_count = threads_count + 1 where id = $(id)", { id: id });
+        };
+        this.addToPostsCounter = function (length, id, task) {
+            return task.none("update forum set posts_count = posts_count + $(length) where id = $(id)", { length: length, id: id });
         };
         this.checkAuthorExistance = function (nickname) {
-            return _this.db.oneOrNone('select id, nickname from "user" where lower(nickname)=lower(${nickname})', { nickname: nickname }, function (userObj) {
+            return _this.db.oneOrNone("select id, nickname from \"user\" where nickname=$(nickname)::citext", { nickname: nickname }, function (userObj) {
                 if (userObj === null) {
                     throw new Error('Author not found!');
                 }
@@ -37,7 +40,7 @@ var Repository = (function () {
             });
         };
         this.checkForumExistance = function (slug) {
-            return _this.db.oneOrNone('select id, slug from forum where lower(slug)=lower(${slug})', { slug: slug }, function (forumObj) {
+            return _this.db.oneOrNone('select id, slug from forum where slug=${slug}::citext', { slug: slug }, function (forumObj) {
                 if (forumObj === null) {
                     throw new Error('Forum not found!');
                 }

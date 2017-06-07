@@ -11,4 +11,4 @@ select
 from
     "user"
 where
-    lower(nickname)=lower(${nickname});
+    nickname=${nickname}::citext;

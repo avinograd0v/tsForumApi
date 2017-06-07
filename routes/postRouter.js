@@ -23,12 +23,18 @@ var PostRouter = (function () {
         });
     };
     PostRouter.prototype.getPostDetails = function (req, res, next) {
+        var isForum = req.query.related !== undefined && req.query.related.includes('forum');
+        var isUser = req.query.related !== undefined && req.query.related.includes('user');
+        var isThread = req.query.related !== undefined && req.query.related.includes('thread');
         db.posts.details({
             id: +req.params.id,
-            conditionalForum: req.query.related !== undefined && req.query.related.includes('forum') ? "\n        json_build_object(\n          'posts', (select count(id) from post where forum_id=f.id),\n          'slug', f.slug,\n          'threads', (select count(id) from thread where forum_id=f.id),\n          'title', f.title,\n          'user', (select nickname from \"user\" where id=f.user_id)) as forum,\n      " : '',
-            conditionalAuthor: req.query.related !== undefined && req.query.related.includes('user') ? "\n        json_build_object(\n          'about', u.about,\n          'email', u.email,\n          'fullname', u.fullname,\n          'nickname', u.nickname) as author,\n      " : '',
-            conditionalThread: req.query.related !== undefined && req.query.related.includes('thread') ? ",\n        json_build_object(\n          'author', (select nickname from \"user\" where id=t.author_id),\n          'forum', f.slug,\n          'id', t.id,\n          'message', t.message,\n          'slug', t.slug,\n          'title', t.title,\n          'votes', COALESCE((select sum(vote) from vote where thread_id=t.id), 0)::integer\n           ) as thread, t.created as threadcreated\n      " : '',
-            conditionalJoinThread: req.query.related !== undefined && req.query.related.includes('thread') ? "\n        inner join thread t on p.thread_id=t.id\n      " : ''
+            conditionalForum: isForum ? "\n        json_build_object(\n          'posts', f.posts_count,\n          'slug', p.forum_slug,\n          'threads', f.threads_count,\n          'title', f.title,\n          'user', f.user_nickname) as forum,\n      " : '',
+            conditionalAuthor: isUser ? "\n        json_build_object(\n          'about', u.about,\n          'email', u.email,\n          'fullname', u.fullname,\n          'nickname', p.author_nickname) as author,\n      " : '',
+            // Поправить счетчики голосов постов и веток
+            conditionalThread: isThread ? ",\n        json_build_object(\n          'author', t.author_nickname,\n          'forum', p.forum_slug,\n          'id', p.thread_id,\n          'message', t.message,\n          'slug', p.thread_slug,\n          'title', t.title,\n          'votes', t.votes\n           ) as thread, t.created as threadcreated\n      " : '',
+            conditionalJoinThread: isThread ? "\n        inner join thread t on p.thread_id=t.id\n      " : '',
+            conditionalJoinAuthor: isUser ? "\n        inner join \"user\" u on p.author_id=u.id\n      " : '',
+            conditionalJoinForum: isForum ? "\n        inner join forum f on p.forum_id=f.id\n      " : ''
         })
             .then(function (data) {
             data.post.created = data.postcreated;

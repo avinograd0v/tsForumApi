@@ -17,35 +17,39 @@ export class Repository {
     this.pgp = pgp
   }
 
-  create = (posts: any, info: any) => {
-    return this.db.tx((t: any) => {
-      const queries = (Object as any).values(posts).map((post: any) => {
-        return t.oneOrNone(sql.create, (Object as any).assign(info, {
-          author: post.author,
-          created: post.created,
-          isEdited: post.isEdited === true ? true : false,
-          message: post.message,
-          parent: (post.parent === 0 || post.parent === undefined) ? 0 : `
-            case when exists(select id from post where id = ${post.parent} and thread_id = ${info.threadid})
-            then ${post.parent} else null end
-          `
-        }), (data: any) => {
-          if (data === null) {
+  create = (posts: any, info: any, task: any) => {
+    return task.tx((t: any) => {
+      const chObj = posts.reduce((prev: any, curr: any) => {
+        prev.parents.push(curr.parent || 0)
+        prev.messages.push(curr.message)
+        prev.authors.push(curr.author)
+        return prev
+      }, { parents: [], messages: [], authors: [] })
+
+      const query = t.any(sql.create, (Object as any).assign(info, chObj))
+        .then((data: any) => {
+          if (data.length !== posts.length) {
             throw new Error('notfound')
           }
+          if (data.some((p: any) => p.parent === null)) {
+            throw new Error('wrong parent id')
+          }
+          t.posts.addToUserForumRelations({forumID: info.forumid, authors: chObj.authors})
           return data
         })
-      })
 
-      return t.batch(queries)
+      return query
     })
   }
 
-  getForumAndThread = (identifier: any) => {
-    return this.db.oneOrNone(`
-     select t.id as threadID, t.slug as threadSlug, f.id as forumID,
-     f.slug as forumSlug from thread t inner
-     join forum f on t.forum_id=f.id where $(identifier:raw)`,
+  addToUserForumRelations (info: any) {
+    this.db.none(sql.addToUserForumRelation, info)
+  }
+
+  getForumAndThread = (identifier: any, task: any) => {
+    return task.oneOrNone(`
+     select id as threadID, slug as threadSlug, forum_id as forumID,
+     forum_slug as forumSlug from thread where $(identifier:raw)`,
       {identifier}, (result: any) => {
         if (result === null) {
           throw new Error('notfound')

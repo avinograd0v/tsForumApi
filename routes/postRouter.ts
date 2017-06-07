@@ -27,36 +27,46 @@ export class PostRouter {
   }
 
   public getPostDetails (req: Request, res: Response, next: NextFunction): void {
+    const isForum = req.query.related !== undefined && req.query.related.includes('forum')
+    const isUser = req.query.related !== undefined && req.query.related.includes('user')
+    const isThread = req.query.related !== undefined && req.query.related.includes('thread')
     db.posts.details({
       id: +req.params.id,
-      conditionalForum: req.query.related !== undefined && req.query.related.includes('forum') ? `
+      conditionalForum: isForum ? `
         json_build_object(
-          'posts', (select count(id) from post where forum_id=f.id),
-          'slug', f.slug,
-          'threads', (select count(id) from thread where forum_id=f.id),
+          'posts', f.posts_count,
+          'slug', p.forum_slug,
+          'threads', f.threads_count,
           'title', f.title,
-          'user', (select nickname from "user" where id=f.user_id)) as forum,
+          'user', f.user_nickname) as forum,
       ` : '',
-      conditionalAuthor: req.query.related !== undefined && req.query.related.includes('user') ? `
+      conditionalAuthor: isUser ? `
         json_build_object(
           'about', u.about,
           'email', u.email,
           'fullname', u.fullname,
-          'nickname', u.nickname) as author,
+          'nickname', p.author_nickname) as author,
       ` : '',
-      conditionalThread: req.query.related !== undefined && req.query.related.includes('thread') ? `,
+      // Поправить счетчики голосов постов и веток
+      conditionalThread: isThread ? `,
         json_build_object(
-          'author', (select nickname from "user" where id=t.author_id),
-          'forum', f.slug,
-          'id', t.id,
+          'author', t.author_nickname,
+          'forum', p.forum_slug,
+          'id', p.thread_id,
           'message', t.message,
-          'slug', t.slug,
+          'slug', p.thread_slug,
           'title', t.title,
-          'votes', COALESCE((select sum(vote) from vote where thread_id=t.id), 0)::integer
+          'votes', t.votes
            ) as thread, t.created as threadcreated
       ` : '',
-      conditionalJoinThread: req.query.related !== undefined && req.query.related.includes('thread') ? `
+      conditionalJoinThread: isThread ? `
         inner join thread t on p.thread_id=t.id
+      ` : '',
+      conditionalJoinAuthor: isUser ? `
+        inner join "user" u on p.author_id=u.id
+      ` : '',
+      conditionalJoinForum: isForum ? `
+        inner join forum f on p.forum_id=f.id
       ` : ''
     })
       .then((data: any) => {

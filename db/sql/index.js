@@ -37,12 +37,15 @@ module.exports = {
         vote: sql('threads/vote.sql'),
         posts: sql('threads/posts.sql'),
         tree: sql('threads/tree.sql'),
-        parentTree: sql('threads/parenttree.sql')
+        parentTree: sql('threads/parenttree.sql'),
+        updatevotes: sql('threads/updatevotes.sql'),
+        addToUserForumRelation: sql('threads/addToUserForumRelation.sql')
     },
     posts: {
         details: sql('posts/details.sql'),
         update: sql('posts/update.sql'),
-        create: sql('posts/create.sql')
+        create: sql('posts/create.sql'),
+        addToUserForumRelation: sql('posts/addToUserForumRelation.sql')
     },
     services: {
         clear: sql('services/clear.sql'),

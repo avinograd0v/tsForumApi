@@ -26,6 +26,7 @@ var config = {
     password: 'docker'
 };
 var pgp = pgPromise(options);
+pgp.pg.defaults.poolSize = 20;
 var db = pgp(config);
 diag.init(options);
 module.exports = { db: db, pgp: pgp };

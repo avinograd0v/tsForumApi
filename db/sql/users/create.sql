@@ -6,9 +6,9 @@
 with tuple as (
     select
         ${about}::text as about,
-        ${email}::text as email,
+        ${email}::citext as email,
         ${fullname}::text as fullname,
-        ${nickname}::text as nickname
+        ${nickname}::citext as nickname
     ),
     ins as (
         insert into "user" (about, email, fullname, nickname)
@@ -20,7 +20,7 @@ select 'inserted' AS action, about, email, fullname, nickname FROM ins
 union all
 select 'updated' AS action, u.about, u.email, u.fullname, u.nickname
 from   tuple t
-inner join "user" u on lower(u.email) = lower(t.email) or lower(u.nickname) = lower(t.nickname);
+inner join "user" u on u.email = t.email or u.nickname = t.nickname;
 
 --with inserted_result as (insert
 --into

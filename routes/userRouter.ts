@@ -38,8 +38,13 @@ export class UserRouter {
   public getProfile (req: Request, res: Response, next: NextFunction): void {
     db.users.profile(req.params.nickname)
       .then((data: any) => {
-        res.status(200)
-          .json(data)
+        if (data) {
+          res.status(200)
+            .json(data)
+        } else {
+          res.status(404)
+            .end()
+        }
       })
       .catch((e: Error) => {
         res.status(404)
@@ -48,14 +53,16 @@ export class UserRouter {
   }
 
   public changeProfile (req: Request, res: Response, next: NextFunction): void {
-    db.users.checkExistanceErrors(req.params.nickname, req.body.email)
-      .then(() =>
-      db.users.update({
-        nickname: req.params.nickname,
-        about: req.body.about,
-        email: req.body.email,
-        fullname: req.body.fullname
-      }))
+    db.task((t: any) => {
+      return t.users.checkExistanceErrors(req.params.nickname, req.body.email)
+        .then(() =>
+          t.users.update({
+            nickname: req.params.nickname,
+            about: req.body.about,
+            email: req.body.email,
+            fullname: req.body.fullname
+          }))
+    })
       .then((data: any) => {
         res.status(200)
           .json(data)

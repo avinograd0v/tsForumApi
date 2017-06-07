@@ -8,27 +8,30 @@ var sql = sqlProvider.posts;
 var Repository = (function () {
     function Repository(db, pgp) {
         var _this = this;
-        this.create = function (posts, info) {
-            return _this.db.tx(function (t) {
-                var queries = Object.values(posts).map(function (post) {
-                    return t.oneOrNone(sql.create, Object.assign(info, {
-                        author: post.author,
-                        created: post.created,
-                        isEdited: post.isEdited === true ? true : false,
-                        message: post.message,
-                        parent: (post.parent === 0 || post.parent === undefined) ? 0 : "\n            case when exists(select id from post where id = " + post.parent + " and thread_id = " + info.threadid + ")\n            then " + post.parent + " else null end\n          "
-                    }), function (data) {
-                        if (data === null) {
-                            throw new Error('notfound');
-                        }
-                        return data;
-                    });
+        this.create = function (posts, info, task) {
+            return task.tx(function (t) {
+                var chObj = posts.reduce(function (prev, curr) {
+                    prev.parents.push(curr.parent || 0);
+                    prev.messages.push(curr.message);
+                    prev.authors.push(curr.author);
+                    return prev;
+                }, { parents: [], messages: [], authors: [] });
+                var query = t.any(sql.create, Object.assign(info, chObj))
+                    .then(function (data) {
+                    if (data.length !== posts.length) {
+                        throw new Error('notfound');
+                    }
+                    if (data.some(function (p) { return p.parent === null; })) {
+                        throw new Error('wrong parent id');
+                    }
+                    t.posts.addToUserForumRelations({ forumID: info.forumid, authors: chObj.authors });
+                    return data;
                 });
-                return t.batch(queries);
+                return query;
             });
         };
-        this.getForumAndThread = function (identifier) {
-            return _this.db.oneOrNone("\n     select t.id as threadID, t.slug as threadSlug, f.id as forumID,\n     f.slug as forumSlug from thread t inner\n     join forum f on t.forum_id=f.id where $(identifier:raw)", { identifier: identifier }, function (result) {
+        this.getForumAndThread = function (identifier, task) {
+            return task.oneOrNone("\n     select id as threadID, slug as threadSlug, forum_id as forumID,\n     forum_slug as forumSlug from thread where $(identifier:raw)", { identifier: identifier }, function (result) {
                 if (result === null) {
                     throw new Error('notfound');
                 }
@@ -54,6 +57,9 @@ var Repository = (function () {
         this.db = db;
         this.pgp = pgp;
     }
+    Repository.prototype.addToUserForumRelations = function (info) {
+        this.db.none(sql.addToUserForumRelation, info);
+    };
     return Repository;
 }());
 exports.Repository = Repository;

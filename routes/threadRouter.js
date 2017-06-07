@@ -33,7 +33,7 @@ var ThreadRouter = (function () {
         this.init();
     }
     ThreadRouter.prototype.getThreadDetails = function (req, res, next) {
-        var identifier = isNaN(req.params.identifier) ? "lower(t.slug) = lower('" + req.params.identifier + "')"
+        var identifier = isNaN(req.params.identifier) ? "t.slug = '" + req.params.identifier + "'::citext"
             : "t.id = " + +req.params.identifier;
         db.threads.details(identifier)
             .then(function (data) {
@@ -47,7 +47,7 @@ var ThreadRouter = (function () {
         });
     };
     ThreadRouter.prototype.changeThreadDetails = function (req, res, next) {
-        var identifier = isNaN(req.params.identifier) ? "lower(slug) = lower('" + req.params.identifier + "')"
+        var identifier = isNaN(req.params.identifier) ? "slug = '" + req.params.identifier + "'::citext"
             : "id = " + +req.params.identifier;
         db.threads.update({
             message: req.body.message,
@@ -65,7 +65,7 @@ var ThreadRouter = (function () {
         });
     };
     ThreadRouter.prototype.changeVotes = function (req, res, next) {
-        var identifier = isNaN(req.params.identifier) ? "lower(t.slug) = lower('" + req.params.identifier + "')"
+        var identifier = isNaN(req.params.identifier) ? "t.slug = '" + req.params.identifier + "'::citext"
             : "t.id = " + +req.params.identifier;
         db.threads.vote({
             nickname: req.body.nickname,
@@ -83,15 +83,20 @@ var ThreadRouter = (function () {
         });
     };
     ThreadRouter.prototype.addPosts = function (req, res, next) {
-        var identifier = isNaN(req.params.identifier) ? "lower(t.slug) = lower('" + req.params.identifier + "')"
-            : "t.id = " + +req.params.identifier;
-        db.posts.getForumAndThread(identifier)
-            .then(function (info) {
-            return db.posts.create(req.body, info);
-        })
-            .then(function (data) {
-            res.status(201)
-                .json(data);
+        var identifier = isNaN(req.params.identifier) ? "slug = '" + req.params.identifier + "'::citext"
+            : "id = " + +req.params.identifier;
+        var fId;
+        db.task(function (t) {
+            return t.posts.getForumAndThread(identifier, t)
+                .then(function (info) {
+                fId = info.forumid;
+                return t.posts.create(req.body, info, t);
+            })
+                .then(function (data) {
+                res.status(201)
+                    .json(data);
+                return t.forums.addToPostsCounter(req.body.length, fId, t);
+            });
         })
             .catch(function (e) {
             console.log(e);
@@ -100,22 +105,28 @@ var ThreadRouter = (function () {
         });
     };
     ThreadRouter.prototype.getThreadPosts = function (req, res, next) {
-        var identifier = isNaN(req.params.identifier) ? "lower(t.slug) = lower('" + req.params.identifier + "')"
-            : "t.id = " + +req.params.identifier;
+        var identifier2 = isNaN(req.params.identifier) ? "slug = '" + req.params.identifier + "'::citext"
+            : "id = " + +req.params.identifier;
         var marker = req.query.marker === undefined ? 0 : +req.query.marker;
-        var affected = {};
-        db.posts.getForumAndThread(identifier)
-            .then(function (info) {
-            return db.threads.posts({
-                identifier: identifier,
-                marker: marker,
-                conditionalLimit: req.query.limit === undefined ? '' : "limit " + req.query.limit,
-                sort: req.query.sort === undefined ? 'flat' : req.query.sort,
-                orderCondition: req.query.desc === 'true' ? 'desc' : 'asc'
-            }, affected);
+        db.task(function (t) {
+            return t.threads.exists(identifier2)
+                .then(function (info) {
+                if (info.id) {
+                    return t.threads.posts({
+                        identifier: info.id,
+                        marker: marker,
+                        conditionalLimit: req.query.limit === undefined ? '' : "limit " + req.query.limit,
+                        sort: req.query.sort === undefined ? 'flat' : req.query.sort,
+                        orderCondition: req.query.desc === 'true' ? 'desc' : 'asc'
+                    });
+                }
+                else {
+                    throw new Error('notfound');
+                }
+            });
         })
             .then(function (data) {
-            marker += affected.marker === undefined ? data.length : affected.marker;
+            marker += (data.length === 0) ? 0 : +req.query.limit;
             data.forEach(function (post) { if (post.parent === 0) {
                 delete post.parent;
             } });

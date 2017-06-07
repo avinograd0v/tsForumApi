@@ -7,8 +7,8 @@ select
     ${conditionalAuthor:raw}
     ${conditionalForum:raw}
     json_build_object(
-        'author', u.nickname,
-        'forum', f.slug,
+        'author', p.author_nickname,
+        'forum', p.forum_slug,
         'id', p.id,
         'isEdited', p.isedited,
         'message', p.message,
@@ -19,12 +19,8 @@ select
     ${conditionalThread:raw}
 from
     post p
-inner join
-    "user" u
-        on u.id=p.author_id
-inner join
-    forum f
-        on f.id=p.forum_id
 ${conditionalJoinThread:raw}
+${conditionalJoinForum:raw}
+${conditionalJoinAuthor:raw}
 where
     p.id=${id};

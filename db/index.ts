@@ -40,6 +40,8 @@ const config = {
 
 const pgp: IMain = pgPromise(options)
 
+pgp.pg.defaults.poolSize = 20
+
 const db = pgp(config) as IDatabase<IExtensions>&IExtensions
 
 diag.init(options)

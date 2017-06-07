@@ -37,7 +37,7 @@ export class ThreadRouter {
   }
 
   public getThreadDetails (req: Request, res: Response, next: NextFunction): void {
-    const identifier = isNaN(req.params.identifier) ? `lower(t.slug) = lower('${req.params.identifier}')`
+    const identifier = isNaN(req.params.identifier) ? `t.slug = '${req.params.identifier}'::citext`
       : `t.id = ${+req.params.identifier}`
     db.threads.details(identifier)
       .then((data: any) => {
@@ -52,7 +52,7 @@ export class ThreadRouter {
   }
 
   public changeThreadDetails (req: Request, res: Response, next: NextFunction): void {
-    const identifier = isNaN(req.params.identifier) ? `lower(slug) = lower('${req.params.identifier}')`
+    const identifier = isNaN(req.params.identifier) ? `slug = '${req.params.identifier}'::citext`
       : `id = ${+req.params.identifier}`
     db.threads.update({
       message: req.body.message,
@@ -71,7 +71,7 @@ export class ThreadRouter {
   }
 
   public changeVotes (req: Request, res: Response, next: NextFunction): void {
-    const identifier = isNaN(req.params.identifier) ? `lower(t.slug) = lower('${req.params.identifier}')`
+    const identifier = isNaN(req.params.identifier) ? `t.slug = '${req.params.identifier}'::citext`
       : `t.id = ${+req.params.identifier}`
     db.threads.vote({
       nickname: req.body.nickname,
@@ -90,15 +90,22 @@ export class ThreadRouter {
   }
 
   public addPosts (req: Request, res: Response, next: NextFunction): void {
-    const identifier = isNaN(req.params.identifier) ? `lower(t.slug) = lower('${req.params.identifier}')`
-      : `t.id = ${+req.params.identifier}`
-    db.posts.getForumAndThread(identifier)
-      .then((info: any) =>
-        db.posts.create(req.body, info))
-      .then((data: any) => {
-        res.status(201)
-          .json(data)
-      })
+    const identifier = isNaN(req.params.identifier) ? `slug = '${req.params.identifier}'::citext`
+      : `id = ${+req.params.identifier}`
+    let fId: any
+    db.task((t: any) => {
+      return t.posts.getForumAndThread(identifier, t)
+        .then((info: any) => {
+          fId = info.forumid
+          return t.posts.create(req.body, info, t)
+        }
+      )
+        .then((data: any) => {
+          res.status(201)
+            .json(data)
+          return t.forums.addToPostsCounter(req.body.length, fId, t)
+        })
+    })
       .catch((e: Error) => {
         console.log(e)
         res.status(e.message === 'notfound' ? 404 : 409)
@@ -107,21 +114,27 @@ export class ThreadRouter {
   }
 
   public getThreadPosts (req: Request, res: Response, next: NextFunction): void {
-    const identifier = isNaN(req.params.identifier) ? `lower(t.slug) = lower('${req.params.identifier}')`
-      : `t.id = ${+req.params.identifier}`
+    const identifier2 = isNaN(req.params.identifier) ? `slug = '${req.params.identifier}'::citext`
+      : `id = ${+req.params.identifier}`
     let marker = req.query.marker === undefined ? 0 : +req.query.marker
-    let affected: any = {}
-    db.posts.getForumAndThread(identifier)
-      .then((info: any) =>
-        db.threads.posts({
-          identifier,
-          marker,
-          conditionalLimit: req.query.limit === undefined ? '' : `limit ${req.query.limit}`,
-          sort: req.query.sort === undefined ? 'flat' : req.query.sort,
-          orderCondition: req.query.desc === 'true' ? 'desc' : 'asc'
-        }, affected))
+    db.task((t: any) => {
+      return t.threads.exists(identifier2)
+        .then((info: any) => {
+          if (info.id) {
+            return t.threads.posts({
+              identifier: info.id,
+              marker,
+              conditionalLimit: req.query.limit === undefined ? '' : `limit ${req.query.limit}`,
+              sort: req.query.sort === undefined ? 'flat' : req.query.sort,
+              orderCondition: req.query.desc === 'true' ? 'desc' : 'asc'
+            })
+          } else {
+            throw new Error('notfound')
+          }
+        })
+    })
       .then((data: any) => {
-        marker += affected.marker === undefined ? data.length : affected.marker
+        marker += (data.length === 0) ? 0 : +req.query.limit
         data.forEach((post: any) => { if (post.parent === 0) { delete post.parent }})
         const result: any = {marker: '' + marker, posts: data}
         res.status(200)

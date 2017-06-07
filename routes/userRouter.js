@@ -35,8 +35,14 @@ var UserRouter = (function () {
     UserRouter.prototype.getProfile = function (req, res, next) {
         db.users.profile(req.params.nickname)
             .then(function (data) {
-            res.status(200)
-                .json(data);
+            if (data) {
+                res.status(200)
+                    .json(data);
+            }
+            else {
+                res.status(404)
+                    .end();
+            }
         })
             .catch(function (e) {
             res.status(404)
@@ -44,13 +50,15 @@ var UserRouter = (function () {
         });
     };
     UserRouter.prototype.changeProfile = function (req, res, next) {
-        db.users.checkExistanceErrors(req.params.nickname, req.body.email)
-            .then(function () {
-            return db.users.update({
-                nickname: req.params.nickname,
-                about: req.body.about,
-                email: req.body.email,
-                fullname: req.body.fullname
+        db.task(function (t) {
+            return t.users.checkExistanceErrors(req.params.nickname, req.body.email)
+                .then(function () {
+                return t.users.update({
+                    nickname: req.params.nickname,
+                    about: req.body.about,
+                    email: req.body.email,
+                    fullname: req.body.fullname
+                });
             });
         })
             .then(function (data) {

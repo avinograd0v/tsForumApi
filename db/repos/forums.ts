@@ -48,14 +48,19 @@ export class Repository {
     this.db.any(sql.threads, params)
 
   users = (params: any) => {
-    return this.db.result(sql.users, params, (allUsers: any) => {
-      // console.log(allUsers.rows)
-      return allUsers.rows
-    })
+    return this.db.any(sql.users, params)
+  }
+
+  addToCounter = (id: any) => {
+    return this.db.none(`update forum set threads_count = threads_count + 1 where id = $(id)`, { id })
+  }
+
+  addToPostsCounter = (length: number, id: number, task: any) => {
+    return task.none(`update forum set posts_count = posts_count + $(length) where id = $(id)`, { length, id })
   }
 
   checkAuthorExistance = (nickname: string): Promise<any> =>
-    this.db.oneOrNone('select id, nickname from "user" where lower(nickname)=lower(${nickname})',
+    this.db.oneOrNone(`select id, nickname from "user" where nickname=$(nickname)::citext`,
       {nickname}, (userObj: any) => {
         if (userObj === null) {
           throw new Error('Author not found!')
@@ -64,7 +69,7 @@ export class Repository {
       })
 
   checkForumExistance = (slug: string): Promise<any> =>
-    this.db.oneOrNone('select id, slug from forum where lower(slug)=lower(${slug})', {slug},
+    this.db.oneOrNone('select id, slug from forum where slug=${slug}::citext', {slug},
       (forumObj: any) => {
         if (forumObj === null) {
           throw new Error('Forum not found!')
